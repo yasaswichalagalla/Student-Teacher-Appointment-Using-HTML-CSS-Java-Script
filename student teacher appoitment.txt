@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Student-Teacher Appointment Booking</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to right, #a1ffce, #faffd1);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      width: 90%;
+      max-width: 450px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+
+    button {
+      background-color: #4CAF50;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    .logout-btn {
+      background-color: #f44336;
+      margin-bottom: 20px;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 8px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    th {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    .cancel-btn {
+      background-color: #f44336;
+      padding: 5px 10px;
+      border: none;
+      border-radius: 3px;
+      color: white;
+      cursor: pointer;
+    }
+
+    .cancel-btn:hover {
+      background-color: #e53935;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container" id="loginContainer">
+    <h2>Student Login</h2>
+    <label for="loginUsername">Username:</label>
+    <input type="text" id="loginUsername" placeholder="Enter username" />
+    <label for="loginPassword">Password:</label>
+    <input type="password" id="loginPassword" placeholder="Enter password" />
+    <button onclick="login()">Login</button>
+    <p>Don't have an account? <button onclick="showRegister()">Register here</button></p>
+  </div>
+
+  <div class="container" id="registerContainer" style="display:none;">
+    <h2>Student Registration</h2>
+    <label for="registerUsername">Username:</label>
+    <input type="text" id="registerUsername" placeholder="Choose username" />
+    <label for="registerPassword">Password:</label>
+    <input type="password" id="registerPassword" placeholder="Choose password" />
+    <button onclick="register()">Register</button>
+    <p>Already have an account? <button onclick="showLogin()">Login here</button></p>
+  </div>
+
+  <div class="container" id="bookingContainer" style="display:none;">
+    <button class="logout-btn" onclick="logout()">Logout</button>
+    <h2>Book an Appointment</h2>
+
+    <label>Student:</label>
+    <input type="text" id="studentName" readonly />
+
+    <label>Select Teacher:</label>
+    <select id="teacherSelect" onchange="handleTeacherChange()">
+      <option value="">Choose a teacher</option>
+    </select>
+
+    <label>Select Date:</label>
+    <input type="date" id="dateInput" onchange="updateTimeSlots()" disabled />
+
+    <label>Select Time:</label>
+    <select id="timeSelect" disabled>
+      <option value="">Choose a slot</option>
+    </select>
+
+    <button onclick="bookAppointment()">Book Appointment</button>
+
+    <h3>Your Appointment History</h3>
+    <table id="historyTable">
+      <thead>
+        <tr>
+          <th>Teacher</th>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    // -- User Registration & Login --
+
+    function getStudents() {
+      return JSON.parse(localStorage.getItem("students") || "[]");
+    }
+
+    function saveStudents(students) {
+      localStorage.setItem("students", JSON.stringify(students));
+    }
+
+    function register() {
+      const username = document.getElementById("registerUsername").value.trim();
+      const password = document.getElementById("registerPassword").value.trim();
+
+      if (!username || !password) {
+        alert("Please enter both username and password.");
+        return;
+      }
+
+      let students = getStudents();
+      if (students.some(s => s.username === username)) {
+        alert("Username already exists.");
+        return;
+      }
+
+      students.push({ username, password });
+      saveStudents(students);
+
+      alert("Registration successful! Please log in.");
+      showLogin();
+    }
+
+    function login() {
+      const username = document.getElementById("loginUsername").value.trim();
+      const password = document.getElementById("loginPassword").value.trim();
+
+      const students = getStudents();
+      const user = students.find(s => s.username === username && s.password === password);
+
+      if (!user) {
+        alert("Invalid username or password.");
+        return;
+      }
+
+      localStorage.setItem("currentStudent", username);
+      initializeBooking();
+      showBooking();
+    }
+
+    function logout() {
+      localStorage.removeItem("currentStudent");
+      showLogin();
+      clearBookingForm();
+    }
+
+    // -- Show/Hide containers --
+
+    function showLogin() {
+      document.getElementById("loginContainer").style.display = "block";
+      document.getElementById("registerContainer").style.display = "none";
+      document.getElementById("bookingContainer").style.display = "none";
+    }
+
+    function showRegister() {
+      document.getElementById("loginContainer").style.display = "none";
+      document.getElementById("registerContainer").style.display = "block";
+      document.getElementById("bookingContainer").style.display = "none";
+    }
+
+    function showBooking() {
+      document.getElementById("loginContainer").style.display = "none";
+      document.getElementById("registerContainer").style.display = "none";
+      document.getElementById("bookingContainer").style.display = "block";
+    }
+
+    // -- Appointment booking logic --
+
+    const timeSlots = ["10:00 AM", "11:00 AM", "12:00 PM", "02:00 PM", "03:00 PM"];
+    const teacherSelect = document.getElementById("teacherSelect");
+    const dateInput = document.getElementById("dateInput");
+    const timeSelect = document.getElementById("timeSelect");
+
+    function populateTeachers() {
+      const teachers = JSON.parse(localStorage.getItem("teachers") || "[]");
+      teacherSelect.innerHTML = '<option value="">Choose a teacher</option>';
+      teachers.forEach(teacher => {
+        const option = document.createElement("option");
+        option.value = teacher;
+        option.textContent = teacher;
+        teacherSelect.appendChild(option);
+      });
+    }
+
+    function handleTeacherChange() {
+      dateInput.disabled = teacherSelect.value === "";
+      if (!dateInput.disabled) {
+        setDateRange();
+      }
+      updateTimeSlots();
+    }
+
+    function setDateRange() {
+      const today = new Date();
+      const twoMonthsLater = new Date();
+      twoMonthsLater.setMonth(today.getMonth() + 2);
+
+      function toISOStringDate(date) {
+        return date.toISOString().split("T")[0];
+      }
+
+      dateInput.min = toISOStringDate(today);
+      dateInput.max = toISOStringDate(twoMonthsLater);
+      if (dateInput.value) {
+        if (dateInput.value < dateInput.min || dateInput.value > dateInput.max) {
+          dateInput.value = dateInput.min;
+        }
+      } else {
+        dateInput.value = dateInput.min;
+      }
+    }
+
+    function updateTimeSlots() {
+      const teacher = teacherSelect.value;
+      const date = dateInput.value;
+
+      if (!teacher || !date) {
+        timeSelect.innerHTML = '<option value="">Choose a slot</option>';
+        timeSelect.disabled = true;
+        return;
+      }
+
+      const appointments = JSON.parse(localStorage.getItem("appointments") || "[]");
+      const bookedSlots = appointments
+        .filter(app => app.teacher === teacher && app.date === date)
+        .map(app => app.time);
+
+      timeSelect.innerHTML = "";
+
+      const availableSlots = timeSlots.filter(slot => !bookedSlots.includes(slot));
+      if (availableSlots.length === 0) {
+        const option = document.createElement("option");
+        option.textContent = "No available slots";
+        option.disabled = true;
+        timeSelect.appendChild(option);
+        timeSelect.disabled = true;
+        return;
+      }
+
+      availableSlots.forEach(slot => {
+        const option = document.createElement("option");
+        option.value = slot;
+        option.textContent = slot;
+        timeSelect.appendChild(option);
+      });
+
+      timeSelect.disabled = false;
+    }
+
+    function bookAppointment() {
+      const studentName = localStorage.getItem("currentStudent");
+      const teacher = teacherSelect.value;
+      const date = dateInput.value;
+      const time = timeSelect.value;
+
+      if (!teacher || !date || !time) {
+        alert("Please fill in all fields.");
+        return;
+      }
+
+      const appointment = {
+        student: studentName,
+        teacher,
+        date,
+        time
+      };
+
+      const appointments = JSON.parse(localStorage.getItem("appointments") || "[]");
+      // Check if this slot is already booked by the student
+      const conflict = appointments.find(app =>
+        app.teacher === teacher && app.date === date && app.time === time);
+
+      if (conflict) {
+        alert("This time slot is already booked.");
+        return;
+      }
+
+      appointments.push(appointment);
+      localStorage.setItem("appointments", JSON.stringify(appointments));
+
+      alert("Appointment booked!");
+      updateTimeSlots();
+      loadAppointmentHistory();
+    }
+
+    function loadAppointmentHistory() {
+      const tableBody = document.querySelector("#historyTable tbody");
+      tableBody.innerHTML = "";
+
+      const studentName = localStorage.getItem("currentStudent");
+      const appointments = JSON.parse(localStorage.getItem("appointments") || "[]");
+      const studentAppointments = appointments.filter(app => app.student === studentName);
+
+      studentAppointments.forEach((app, index) => {
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+          <td>${app.teacher}</td>
+          <td>${app.date}</td>
+          <td>${app.time}</td>
+          <td><button class="cancel-btn" onclick="cancelAppointment(${index})">Cancel</button></td>
+        `;
+
+        tableBody.appendChild(row);
+      });
+    }
+
+    function cancelAppointment(index) {
+      const studentName = localStorage.getItem("currentStudent");
+      const appointments = JSON.parse(localStorage.getItem("appointments") || "[]");
+      const studentAppointments = appointments.filter(app => app.student === studentName);
+
+      const toRemove = studentAppointments[index];
+      const updatedAppointments = appointments.filter(app =>
+        !(app.student === toRemove.student && app.teacher === toRemove.teacher && app.date === toRemove.date && app.time === toRemove.time)
+      );
+
+      localStorage.setItem("appointments", JSON.stringify(updatedAppointments));
+      alert("Appointment cancelled!");
+      updateTimeSlots();
+      loadAppointmentHistory();
+    }
+
+    function clearBookingForm() {
+      teacherSelect.value = "";
+      dateInput.value = "";
+      timeSelect.innerHTML = '<option value="">Choose a slot</option>';
+      timeSelect.disabled = true;
+      dateInput.disabled = true;
+      document.getElementById("studentName").value = "";
+      const tableBody = document.querySelector("#historyTable tbody");
+      tableBody.innerHTML = "";
+    }
+
+    // Initialize teachers & booking on login
+    function initializeBooking() {
+      const studentName = localStorage.getItem("currentStudent");
+      if (studentName) {
+        document.getElementById("studentName").value = studentName;
+        populateTeachers();
+        dateInput.disabled = true;
+        timeSelect.disabled = true;
+        loadAppointmentHistory();
+      }
+    }
+
+    // On page load: show login or booking depending on login status
+    window.onload = function () {
+      const currentStudent = localStorage.getItem("currentStudent");
+      if (currentStudent) {
+        showBooking();
+        initializeBooking();
+      } else {
+        showLogin();
+      }
+      // Set default teachers list once if not present
+      if (!localStorage.getItem("teachers")) {
+        const defaultTeachers = [
+          "Mr. Patel",
+          "Miss Scott",
+          "Mr. Srinivas",
+          "Miss Anusha",
+          "Mrs. Umadevi"
+        ];
+        localStorage.setItem("teachers", JSON.stringify(defaultTeachers));
+      }
+    };
+  </script>
+
+</body>
+</html>
